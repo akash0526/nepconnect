@@ -35,10 +35,30 @@ export default function Home() {
 		if (
 			confirm("Has this been sold? Removing this will hide it from the map.")
 		) {
-			const { error } = await supabase.from("listings").delete().eq("id", id);
-			if (!error) window.location.reload(); // Refresh to show it's gone
+			// We add .eq("user_id", myId) as an extra security layer
+			const { error } = await supabase
+				.from("listings")
+				.delete()
+				.eq("id", id)
+				.eq("user_id", myId);
+
+			if (error) {
+				alert("Error deleting item: " + error.message);
+			} else {
+				// Optimistic UI update: remove from state so it disappears instantly
+				// without a full page reload
+				setItems((prevItems) => prevItems.filter((item) => item.id !== id));
+			}
 		}
 	};
+	// const handleDelete = async (id) => {
+	// 	if (
+	// 		confirm("Has this been sold? Removing this will hide it from the map.")
+	// 	) {
+	// 		const { error } = await supabase.from("listings").delete().eq("id", id);
+	// 		if (!error) window.location.reload(); // Refresh to show it's gone
+	// 	}
+	// };
 	useEffect(() => {
 		const fetchItems = async () => {
 			setLoading(true);
