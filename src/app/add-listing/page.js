@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase, getDeviceId } from "../../lib/supabase";
 import {
 	Loader2,
@@ -8,6 +8,9 @@ import {
 	Plus,
 	Sparkles,
 	CheckCircle2,
+	Camera,
+	MapPin,
+	Navigation,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import imageCompression from "browser-image-compression";
@@ -29,22 +32,27 @@ export default function AddListing() {
 	const [loading, setLoading] = useState(false);
 	const [isAnalyzing, setIsAnalyzing] = useState(false);
 	const [aiAnalysis, setAiAnalysis] = useState(null);
+	const [gettingLocation, setGettingLocation] = useState(false);
 	const router = useRouter();
 
 	const [files, setFiles] = useState([]);
 	const [previews, setPreviews] = useState([]);
 	const [selectedPos, setSelectedPos] = useState(null);
+	const [manualAddress, setManualAddress] = useState("");
+	const [showCamera, setShowCamera] = useState(false);
+	const videoRef = useRef(null);
+	const canvasRef = useRef(null);
 
 	// Form states
 	const [title, setTitle] = useState("");
-	const [description, setDescription] = useState(""); // <-- NEW
+	const [description, setDescription] = useState("");
 	const [category, setCategory] = useState("Agriculture");
 
 	useEffect(() => {
 		return () => previews.forEach((url) => URL.revokeObjectURL(url));
 	}, [previews]);
 
-	// Auto‑trigger AI analysis on first image upload
+	// Auto‑trigger AI analysis
 	useEffect(() => {
 		if (files.length > 0 && !aiAnalysis && !isAnalyzing) {
 			runMultiImageAnalysis(files);
@@ -73,14 +81,11 @@ export default function AddListing() {
 			const data = await res.json();
 			if (data && !data.error) {
 				setAiAnalysis(data);
-				// Auto‑fill title and description if they're empty
 				if (!title) setTitle(data.title || data.detected_item || "");
 				if (!description) {
-					// Combine description and appearance into one text block
 					const fullDescription = `${data.description || ""}\n\nAppearance: ${data.appearance || ""}`;
 					setDescription(fullDescription.trim());
 				}
-				// Optional: also pre‑fill category if the AI returned a valid one
 				if (data.category) {
 					const validCategories = [
 						"Agriculture",
@@ -107,7 +112,11 @@ export default function AddListing() {
 
 	const handleFileChange = async (e) => {
 		const selectedFiles = Array.from(e.target.files);
-		if (files.length + selectedFiles.length > 4) {
+		await addFiles(selectedFiles);
+	};
+
+	const addFiles = async (newFiles) => {
+		if (files.length + newFiles.length > 4) {
 			alert("Maximum 4 images allowed.");
 			return;
 		}
@@ -120,7 +129,7 @@ export default function AddListing() {
 
 		try {
 			const compressedResults = await Promise.all(
-				selectedFiles.map((f) => imageCompression(f, options)),
+				newFiles.map((f) => imageCompression(f, options)),
 			);
 			const newPreviews = compressedResults.map((f) => URL.createObjectURL(f));
 			setFiles((prev) => [...prev, ...compressedResults]);
@@ -134,6 +143,76 @@ export default function AddListing() {
 		setFiles((prev) => prev.filter((_, i) => i !== index));
 		setPreviews((prev) => prev.filter((_, i) => i !== index));
 		if (files.length <= 1) setAiAnalysis(null);
+	};
+
+	// Get current location using Geolocation API
+	const getCurrentLocation = () => {
+		if (!navigator.geolocation) {
+			alert("Geolocation is not supported by your browser.");
+			return;
+		}
+
+		setGettingLocation(true);
+		navigator.geolocation.getCurrentPosition(
+			(position) => {
+				const { latitude, longitude } = position.coords;
+				setSelectedPos({ lat: latitude, lng: longitude });
+				setGettingLocation(false);
+			},
+			(error) => {
+				console.error("Geolocation error:", error);
+				alert("Unable to retrieve your location. Please check permissions.");
+				setGettingLocation(false);
+			},
+			{ enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+		);
+	};
+
+	// Camera handling
+	const startCamera = async () => {
+		setShowCamera(true);
+		try {
+			const stream = await navigator.mediaDevices.getUserMedia({
+				video: { facingMode: "environment" },
+			});
+			if (videoRef.current) {
+				videoRef.current.srcObject = stream;
+				videoRef.current.onloadedmetadata = () => {
+					videoRef.current
+						.play()
+						.catch((e) => console.log("Play interrupted:", e));
+				};
+			}
+		} catch (err) {
+			alert("Could not access camera. Please allow camera permissions.");
+			setShowCamera(false);
+		}
+	};
+
+	const capturePhoto = () => {
+		if (videoRef.current && canvasRef.current) {
+			const video = videoRef.current;
+			const canvas = canvasRef.current;
+			canvas.width = video.videoWidth;
+			canvas.height = video.videoHeight;
+			const ctx = canvas.getContext("2d");
+			ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+			canvas.toBlob(async (blob) => {
+				const file = new File([blob], `camera-${Date.now()}.jpg`, {
+					type: "image/jpeg",
+				});
+				await addFiles([file]);
+				stopCamera();
+			}, "image/jpeg");
+		}
+	};
+
+	const stopCamera = () => {
+		setShowCamera(false);
+		if (videoRef.current?.srcObject) {
+			videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
+		}
 	};
 
 	const uploadAllImages = async () => {
@@ -170,18 +249,18 @@ export default function AddListing() {
 			const { error } = await supabase.from("listings").insert([
 				{
 					title: title,
-					description: description, // <-- NEW
+					description: description,
 					price: e.target.price.value,
 					phone: e.target.phone.value,
 					category: category,
 					image_urls: imageUrls,
 					latitude: selectedPos?.lat || null,
 					longitude: selectedPos?.lng || null,
+					manual_address: manualAddress || null,
 					user_id: getDeviceId(),
 					ai_detected_item:
 						aiAnalysis?.title || aiAnalysis?.detected_item || null,
 					ai_condition_report: aiAnalysis?.condition || null,
-					ai_condition_score: null, // Not used in new response; you can map condition to a score if needed
 					is_verified:
 						aiAnalysis?.condition === "New" ||
 						aiAnalysis?.condition === "Like New",
@@ -222,6 +301,36 @@ export default function AddListing() {
 				)}
 			</div>
 
+			{/* Camera Modal */}
+			{showCamera && (
+				<div className="fixed inset-0 bg-black z-50 flex flex-col">
+					<div className="relative flex-1">
+						<video
+							ref={videoRef}
+							className="w-full h-full object-cover"
+							autoPlay
+							playsInline
+							muted
+						/>
+						<button
+							onClick={stopCamera}
+							className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full"
+						>
+							<X size={24} />
+						</button>
+						<div className="absolute bottom-8 left-0 right-0 flex justify-center">
+							<button
+								onClick={capturePhoto}
+								className="bg-white p-4 rounded-full shadow-lg"
+							>
+								<div className="w-12 h-12 rounded-full border-2 border-gray-800" />
+							</button>
+						</div>
+					</div>
+					<canvas ref={canvasRef} className="hidden" />
+				</div>
+			)}
+
 			<form onSubmit={handleSubmit} className="space-y-6">
 				{/* Photo Grid */}
 				<div className="grid grid-cols-2 gap-3">
@@ -250,19 +359,31 @@ export default function AddListing() {
 						</div>
 					))}
 					{files.length < 4 && (
-						<label className="h-36 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-100 transition-all">
-							<Plus size={28} className="text-gray-400" />
-							<span className="text-[11px] font-bold text-gray-500 mt-2">
-								Add Photo
-							</span>
-							<input
-								type="file"
-								accept="image/*"
-								multiple
-								onChange={handleFileChange}
-								className="hidden"
-							/>
-						</label>
+						<>
+							<label className="h-36 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-100 transition-all">
+								<Plus size={28} className="text-gray-400" />
+								<span className="text-[11px] font-bold text-gray-500 mt-2">
+									Add Photo
+								</span>
+								<input
+									type="file"
+									accept="image/*"
+									multiple
+									onChange={handleFileChange}
+									className="hidden"
+								/>
+							</label>
+							<button
+								type="button"
+								onClick={startCamera}
+								className="h-36 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-100 transition-all"
+							>
+								<Camera size={28} className="text-gray-400" />
+								<span className="text-[11px] font-bold text-gray-500 mt-2">
+									Take Photo
+								</span>
+							</button>
+						</>
 					)}
 				</div>
 
@@ -290,7 +411,6 @@ export default function AddListing() {
 						</div>
 					</div>
 
-					{/* NEW: Description Field */}
 					<div className="space-y-1">
 						<label className="text-xs font-bold text-gray-500 uppercase ml-1">
 							Description
@@ -311,11 +431,6 @@ export default function AddListing() {
 								/>
 							)}
 						</div>
-						{aiAnalysis?.appearance && (
-							<p className="text-xs text-gray-400 mt-1 ml-2">
-								AI detected: {aiAnalysis.appearance.substring(0, 60)}...
-							</p>
-						)}
 					</div>
 
 					<div className="grid grid-cols-2 gap-4">
@@ -369,11 +484,50 @@ export default function AddListing() {
 					</div>
 				</div>
 
-				<div className="space-y-2">
-					<label className="text-xs font-bold text-gray-500 uppercase ml-1">
-						Item Location
-					</label>
-					<LocationPicker onLocationChange={(pos) => setSelectedPos(pos)} />
+				{/* Precise Location Section */}
+				<div className="space-y-3">
+					<div className="flex items-center justify-between">
+						<div className="flex items-center gap-2">
+							<MapPin size={18} className="text-green-600" />
+							<h3 className="font-bold text-gray-800">Precise Location</h3>
+						</div>
+						<button
+							type="button"
+							onClick={getCurrentLocation}
+							disabled={gettingLocation}
+							className="flex items-center gap-1 text-xs font-medium text-green-600 bg-green-50 px-3 py-1.5 rounded-full hover:bg-green-100 transition"
+						>
+							{gettingLocation ? (
+								<Loader2 size={12} className="animate-spin" />
+							) : (
+								<Navigation size={12} />
+							)}
+							{gettingLocation ? "Getting..." : "Use Current Location"}
+						</button>
+					</div>
+
+					{/* Manual address input */}
+					<input
+						type="text"
+						value={manualAddress}
+						onChange={(e) => setManualAddress(e.target.value)}
+						placeholder="Enter address or landmark (optional)"
+						className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-green-500"
+					/>
+
+					{/* Map picker with external position control */}
+					<div className="rounded-2xl overflow-hidden border border-gray-200">
+						<LocationPicker
+							onLocationChange={(pos) => setSelectedPos(pos)}
+							externalPosition={selectedPos}
+						/>
+					</div>
+					{selectedPos && (
+						<p className="text-xs text-gray-500">
+							📍 Coordinates: {selectedPos.lat.toFixed(6)},{" "}
+							{selectedPos.lng.toFixed(6)}
+						</p>
+					)}
 				</div>
 
 				<button

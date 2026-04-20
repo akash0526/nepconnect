@@ -1,5 +1,4 @@
 "use client";
-import { useState } from "react";
 import {
 	MapContainer,
 	TileLayer,
@@ -7,118 +6,81 @@ import {
 	useMapEvents,
 	useMap,
 } from "react-leaflet";
-import { Search, X, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
-// Fix for default Leaflet icons in Next.js
-const customIcon = new L.Icon({
-	iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-	iconSize: [25, 41],
-	iconAnchor: [12, 41],
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+	iconRetinaUrl:
+		"https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png",
+	iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
+	shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
 });
 
-function MapClickHandler({ onSelect }) {
+function MapUpdater({ center }) {
+	const map = useMap();
+	useEffect(() => {
+		if (center && center[0] && center[1]) {
+			map.setView(center, map.getZoom());
+		}
+	}, [center, map]);
+	return null;
+}
+
+function LocationMarker({ position, onLocationChange }) {
+	const [markerPos, setMarkerPos] = useState(null);
+
 	useMapEvents({
 		click(e) {
-			onSelect(e.latlng);
+			const { lat, lng } = e.latlng;
+			setMarkerPos([lat, lng]);
+			onLocationChange({ lat, lng });
 		},
 	});
-	return null;
-}
 
-function MapFlyer({ center }) {
-	const map = useMap();
-	if (center) map.flyTo(center, 14);
-	return null;
-}
-
-export default function LocationPicker({ onLocationChange }) {
-	const [pos, setPos] = useState(null);
-	const [query, setQuery] = useState("");
-	const [searching, setSearching] = useState(false);
-
-	const handleSearch = async (e) => {
-		e.preventDefault();
-		if (!query) return;
-		setSearching(true);
-		try {
-			const res = await fetch(
-				`https://nominatim.openstreetmap.org/search?format=json&q=${query}, Nepal`,
-			);
-			const data = await res.json();
-			if (data?.[0]) {
-				const newPos = {
-					lat: parseFloat(data[0].lat),
-					lng: parseFloat(data[0].lon),
-				};
-				setPos(newPos);
-				onLocationChange(newPos);
-			}
-		} catch (err) {
-			console.error(err);
+	useEffect(() => {
+		if (position && position.lat && position.lng) {
+			setMarkerPos([position.lat, position.lng]);
 		}
-		setSearching(false);
+	}, [position]);
+
+	return markerPos ? <Marker position={markerPos} /> : null;
+}
+
+export default function LocationPicker({ onLocationChange, externalPosition }) {
+	const defaultCenter = [27.7172, 85.324];
+	const [center, setCenter] = useState(defaultCenter);
+	const [markerPosition, setMarkerPosition] = useState(null);
+
+	useEffect(() => {
+		if (externalPosition && externalPosition.lat && externalPosition.lng) {
+			setCenter([externalPosition.lat, externalPosition.lng]);
+			setMarkerPosition([externalPosition.lat, externalPosition.lng]);
+		}
+	}, [externalPosition]);
+
+	const handleLocationChange = (pos) => {
+		setMarkerPosition([pos.lat, pos.lng]);
+		onLocationChange(pos);
 	};
 
 	return (
-		<div className="space-y-3 bg-gray-50 p-4 rounded-2xl border border-gray-100">
-			<div className="flex justify-between items-center">
-				<label className="text-sm font-bold text-gray-700">
-					Location (Optional)
-				</label>
-				{pos && (
-					<button
-						type="button"
-						onClick={() => {
-							setPos(null);
-							onLocationChange(null);
-						}}
-						className="text-xs text-red-500 flex items-center gap-1"
-					>
-						<X size={14} /> Clear
-					</button>
-				)}
-			</div>
-
-			<div className="flex gap-2">
-				<input
-					type="text"
-					placeholder="Search area (e.g. Pokhara, Koteshwor)"
-					className="flex-1 p-3 text-sm rounded-xl border border-gray-200 outline-none focus:border-green-500"
-					value={query}
-					onChange={(e) => setQuery(e.target.value)}
-				/>
-				<button
-					type="button"
-					onClick={handleSearch}
-					className="bg-green-600 text-white p-3 rounded-xl"
-				>
-					{searching ? (
-						<Loader2 className="animate-spin" size={18} />
-					) : (
-						<Search size={18} />
-					)}
-				</button>
-			</div>
-
-			<div className="h-44 rounded-xl overflow-hidden border border-gray-200 z-0">
-				<MapContainer
-					center={[28.3949, 84.124]}
-					zoom={6}
-					className="h-full w-full"
-				>
-					<TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-					<MapClickHandler
-						onSelect={(l) => {
-							setPos(l);
-							onLocationChange(l);
-						}}
-					/>
-					{pos && <Marker position={pos} icon={customIcon} />}
-					<MapFlyer center={pos} />
-				</MapContainer>
-			</div>
-		</div>
+		<MapContainer
+			center={center}
+			zoom={13}
+			style={{ height: "200px", width: "100%" }}
+			className="rounded-xl z-0"
+		>
+			<TileLayer
+				attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+				url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+			/>
+			<MapUpdater center={center} />
+			<LocationMarker
+				position={markerPosition}
+				onLocationChange={handleLocationChange}
+			/>
+		</MapContainer>
 	);
 }

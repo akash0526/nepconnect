@@ -9,8 +9,10 @@ import {
 	MessageCircle,
 	Plus,
 	Loader2,
-	Sparkles,
 	ShieldCheck,
+	X,
+	ChevronLeft,
+	ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -28,6 +30,10 @@ export default function Home() {
 	const [loading, setLoading] = useState(true);
 	const [searchQuery, setSearchQuery] = useState("");
 	const myId = getDeviceId();
+
+	const [selectedDescription, setSelectedDescription] = useState(null);
+	const [galleryImages, setGalleryImages] = useState([]);
+	const [galleryIndex, setGalleryIndex] = useState(0);
 
 	const handleDelete = async (id) => {
 		if (
@@ -61,10 +67,9 @@ export default function Home() {
 		(item) =>
 			item.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
 			item.category?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			item.description?.toLowerCase().includes(searchQuery.toLowerCase()), // also search description
+			item.description?.toLowerCase().includes(searchQuery.toLowerCase()),
 	);
 
-	// Helper to get condition badge color
 	const getConditionColor = (condition) => {
 		const map = {
 			New: "bg-green-600",
@@ -76,9 +81,25 @@ export default function Home() {
 		return map[condition] || "bg-gray-400";
 	};
 
+	const openGallery = (e, images, startIndex = 0) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setGalleryImages(images);
+		setGalleryIndex(startIndex);
+	};
+
+	const nextImage = () => {
+		setGalleryIndex((prev) => (prev + 1) % galleryImages.length);
+	};
+
+	const prevImage = () => {
+		setGalleryIndex(
+			(prev) => (prev - 1 + galleryImages.length) % galleryImages.length,
+		);
+	};
+
 	return (
 		<main className="min-h-screen bg-gray-50 pb-24 font-sans">
-			{/* Header */}
 			<div className="bg-green-700 p-6 pb-12 text-white text-center rounded-b-[40px] shadow-lg">
 				<h1 className="text-3xl font-extrabold tracking-tight">NepConnect</h1>
 				<p className="text-sm opacity-90 mt-1">AI-Powered Local Marketplace</p>
@@ -98,7 +119,6 @@ export default function Home() {
 			</div>
 
 			<div className="p-4 max-w-xl mx-auto -mt-8">
-				{/* Map */}
 				<div className="rounded-3xl overflow-hidden shadow-xl border-4 border-white mb-8 bg-white h-[300px]">
 					<Map listings={filteredItems} />
 				</div>
@@ -110,7 +130,6 @@ export default function Home() {
 					</span>
 				</div>
 
-				{/* Items Grid */}
 				<div className="grid gap-4">
 					{loading ? (
 						<div className="flex flex-col items-center py-20 text-gray-400">
@@ -127,27 +146,38 @@ export default function Home() {
 										: [];
 
 							return (
-								<div
+								<Link
+									href={`/product/${item.id}`}
 									key={item.id}
 									className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex flex-row h-auto min-h-48 hover:shadow-md transition-shadow relative"
 								>
-									{/* Owner Delete Button */}
 									{item.user_id === myId && (
 										<button
-											onClick={() => handleDelete(item.id)}
+											onClick={(e) => {
+												e.preventDefault();
+												e.stopPropagation();
+												handleDelete(item.id);
+											}}
 											className="absolute top-2 left-2 bg-red-600 text-white p-2 rounded-full shadow-lg z-20 active:scale-90 transition-all"
 										>
 											<Trash2 size={14} />
 										</button>
 									)}
 
-									{/* Image Section */}
-									<div className="w-1/3 bg-gray-100 relative group">
+									<div
+										className="w-1/3 bg-gray-100 relative group cursor-pointer"
+										onClick={(e) => openGallery(e, images, 0)}
+									>
 										<img
 											src={images[0]}
 											className="w-full h-full object-cover"
 											alt={item.title}
 										/>
+										{images.length > 1 && (
+											<div className="absolute bottom-2 right-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded-full">
+												+{images.length - 1}
+											</div>
+										)}
 										{item.is_verified && (
 											<div className="absolute bottom-2 left-2 bg-blue-600 text-white text-[8px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 shadow-lg">
 												<ShieldCheck size={10} /> AI VERIFIED
@@ -155,14 +185,12 @@ export default function Home() {
 										)}
 									</div>
 
-									{/* Content Section */}
 									<div className="w-2/3 p-4 flex flex-col justify-between">
 										<div>
 											<div className="flex justify-between items-start">
 												<h3 className="font-bold text-gray-900 line-clamp-1 text-lg">
 													{item.title}
 												</h3>
-												{/* Condition badge (new) */}
 												{item.ai_condition_report && (
 													<span
 														className={`text-[8px] font-bold px-2 py-1 rounded-full text-white ${getConditionColor(
@@ -178,75 +206,128 @@ export default function Home() {
 												NPR {item.price}
 											</p>
 
-											{/* Description preview */}
 											{item.description && (
 												<p className="text-xs text-gray-600 mt-1 line-clamp-2 leading-relaxed">
 													{item.description}
 												</p>
 											)}
 
-											{/* AI Appearance hint (optional) */}
 											{item.ai_detected_item && (
 												<p className="text-[10px] text-gray-400 italic mt-1">
 													AI says: {item.ai_detected_item}
 												</p>
 											)}
-
-											{/* Old condition bar – keep for backward compatibility */}
-											{item.ai_condition_score && (
-												<div className="mt-2">
-													<div className="flex justify-between text-[10px] font-bold text-gray-400 mb-1">
-														<span>CONDITION</span>
-														<span>{item.ai_condition_score}/10</span>
-													</div>
-													<div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
-														<div
-															className={`h-full transition-all ${
-																item.ai_condition_score > 7
-																	? "bg-green-500"
-																	: item.ai_condition_score > 4
-																		? "bg-yellow-500"
-																		: "bg-red-500"
-															}`}
-															style={{
-																width: `${item.ai_condition_score * 10}%`,
-															}}
-														/>
-													</div>
-												</div>
-											)}
 										</div>
 
-										{/* Action Buttons */}
+										{/* ACTION BUTTONS - BUTTONS NOT LINKS */}
 										<div className="flex gap-2 mt-3">
-											<a
-												href={`tel:${item.phone}`}
+											<button
+												onClick={(e) => {
+													e.preventDefault();
+													e.stopPropagation();
+													window.location.href = `tel:${item.phone}`;
+												}}
 												className="flex-1 bg-blue-600 text-white py-2 rounded-xl flex items-center justify-center gap-2 font-bold text-xs"
 											>
 												<Phone size={14} /> Call
-											</a>
-											<a
-												href={`https://wa.me/977${item.phone?.replace(/\s/g, "")}?text=Namaste! I saw your ${item.title} on NepConnect.`}
+											</button>
+											<button
+												onClick={(e) => {
+													e.preventDefault();
+													e.stopPropagation();
+													const message = `Namaste! I saw your ${item.title} on NepConnect.`;
+													window.open(
+														`https://wa.me/977${item.phone?.replace(/\s/g, "")}?text=${encodeURIComponent(message)}`,
+														"_blank",
+													);
+												}}
 												className="flex-1 bg-green-500 text-white py-2 rounded-xl flex items-center justify-center gap-2 font-bold text-xs"
 											>
 												<MessageCircle size={14} /> Chat
-											</a>
+											</button>
 										</div>
 									</div>
-								</div>
+								</Link>
 							);
 						})
 					)}
 				</div>
 			</div>
 
-			{/* Floating Action Button */}
 			<Link
 				href="/add-listing"
 				className="fixed bottom-8 right-6 bg-green-600 text-white p-5 rounded-2xl shadow-2xl hover:scale-110 active:scale-95 transition-all z-50"
 			>
 				<Plus size={28} />
 			</Link>
+
+			{selectedDescription && (
+				<div
+					className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+					onClick={() => setSelectedDescription(null)}
+				>
+					<div
+						className="bg-white rounded-2xl max-w-md w-full p-6 max-h-[80vh] overflow-y-auto"
+						onClick={(e) => e.stopPropagation()}
+					>
+						<div className="flex justify-between items-center mb-4">
+							<h3 className="font-bold text-lg">Full Description</h3>
+							<button onClick={() => setSelectedDescription(null)}>
+								<X size={20} />
+							</button>
+						</div>
+						<p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
+							{selectedDescription}
+						</p>
+					</div>
+				</div>
+			)}
+
+			{galleryImages.length > 0 && (
+				<div
+					className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center"
+					onClick={() => setGalleryImages([])}
+				>
+					<div
+						className="relative w-full h-full flex items-center justify-center p-4"
+						onClick={(e) => e.stopPropagation()}
+					>
+						<button
+							className="absolute top-4 right-4 text-white z-10"
+							onClick={() => setGalleryImages([])}
+						>
+							<X size={28} />
+						</button>
+
+						{galleryImages.length > 1 && (
+							<>
+								<button
+									className="absolute left-4 text-white bg-black/30 p-2 rounded-full"
+									onClick={prevImage}
+								>
+									<ChevronLeft size={32} />
+								</button>
+								<button
+									className="absolute right-4 text-white bg-black/30 p-2 rounded-full"
+									onClick={nextImage}
+								>
+									<ChevronRight size={32} />
+								</button>
+							</>
+						)}
+
+						<img
+							src={galleryImages[galleryIndex]}
+							className="max-w-full max-h-full object-contain"
+							alt="Gallery"
+						/>
+
+						<div className="absolute bottom-4 left-0 right-0 text-center text-white text-sm">
+							{galleryIndex + 1} / {galleryImages.length}
+						</div>
+					</div>
+				</div>
+			)}
 		</main>
 	);
 }
