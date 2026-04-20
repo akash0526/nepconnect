@@ -8,8 +8,6 @@ import {
 	Phone,
 	MessageCircle,
 	Plus,
-	Camera,
-	MapPin,
 	Loader2,
 	Sparkles,
 	ShieldCheck,
@@ -61,9 +59,22 @@ export default function Home() {
 
 	const filteredItems = items.filter(
 		(item) =>
-			item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			item.category?.toLowerCase().includes(searchQuery.toLowerCase()),
+			item.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+			item.category?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+			item.description?.toLowerCase().includes(searchQuery.toLowerCase()), // also search description
 	);
+
+	// Helper to get condition badge color
+	const getConditionColor = (condition) => {
+		const map = {
+			New: "bg-green-600",
+			"Like New": "bg-green-500",
+			Good: "bg-yellow-500",
+			Fair: "bg-orange-500",
+			"For Parts": "bg-red-500",
+		};
+		return map[condition] || "bg-gray-400";
+	};
 
 	return (
 		<main className="min-h-screen bg-gray-50 pb-24 font-sans">
@@ -118,7 +129,7 @@ export default function Home() {
 							return (
 								<div
 									key={item.id}
-									className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex flex-row h-48 hover:shadow-md transition-shadow relative"
+									className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex flex-row h-auto min-h-48 hover:shadow-md transition-shadow relative"
 								>
 									{/* Owner Delete Button */}
 									{item.user_id === myId && (
@@ -151,11 +162,15 @@ export default function Home() {
 												<h3 className="font-bold text-gray-900 line-clamp-1 text-lg">
 													{item.title}
 												</h3>
-												{item.ai_condition_score > 7 && (
-													<Sparkles
-														size={16}
-														className="text-yellow-500 fill-yellow-500"
-													/>
+												{/* Condition badge (new) */}
+												{item.ai_condition_report && (
+													<span
+														className={`text-[8px] font-bold px-2 py-1 rounded-full text-white ${getConditionColor(
+															item.ai_condition_report,
+														)}`}
+													>
+														{item.ai_condition_report}
+													</span>
 												)}
 											</div>
 
@@ -163,7 +178,21 @@ export default function Home() {
 												NPR {item.price}
 											</p>
 
-											{/* AI Condition Bar */}
+											{/* Description preview */}
+											{item.description && (
+												<p className="text-xs text-gray-600 mt-1 line-clamp-2 leading-relaxed">
+													{item.description}
+												</p>
+											)}
+
+											{/* AI Appearance hint (optional) */}
+											{item.ai_detected_item && (
+												<p className="text-[10px] text-gray-400 italic mt-1">
+													AI says: {item.ai_detected_item}
+												</p>
+											)}
+
+											{/* Old condition bar – keep for backward compatibility */}
 											{item.ai_condition_score && (
 												<div className="mt-2">
 													<div className="flex justify-between text-[10px] font-bold text-gray-400 mb-1">
@@ -172,21 +201,24 @@ export default function Home() {
 													</div>
 													<div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
 														<div
-															className={`h-full transition-all ${item.ai_condition_score > 7 ? "bg-green-500" : item.ai_condition_score > 4 ? "bg-yellow-500" : "bg-red-500"}`}
+															className={`h-full transition-all ${
+																item.ai_condition_score > 7
+																	? "bg-green-500"
+																	: item.ai_condition_score > 4
+																		? "bg-yellow-500"
+																		: "bg-red-500"
+															}`}
 															style={{
 																width: `${item.ai_condition_score * 10}%`,
 															}}
 														/>
 													</div>
-													<p className="text-[10px] text-gray-400 italic mt-1 line-clamp-1">
-														"{item.ai_condition_report}"
-													</p>
 												</div>
 											)}
 										</div>
 
 										{/* Action Buttons */}
-										<div className="flex gap-2 mt-2">
+										<div className="flex gap-2 mt-3">
 											<a
 												href={`tel:${item.phone}`}
 												className="flex-1 bg-blue-600 text-white py-2 rounded-xl flex items-center justify-center gap-2 font-bold text-xs"

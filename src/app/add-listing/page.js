@@ -35,15 +35,16 @@ export default function AddListing() {
 	const [previews, setPreviews] = useState([]);
 	const [selectedPos, setSelectedPos] = useState(null);
 
-	// Form states for AI auto-fill
+	// Form states
 	const [title, setTitle] = useState("");
+	const [description, setDescription] = useState(""); // <-- NEW
 	const [category, setCategory] = useState("Agriculture");
 
 	useEffect(() => {
 		return () => previews.forEach((url) => URL.revokeObjectURL(url));
 	}, [previews]);
 
-	// Automatically trigger AI analysis when the user adds the FIRST image
+	// Auto‑trigger AI analysis on first image upload
 	useEffect(() => {
 		if (files.length > 0 && !aiAnalysis && !isAnalyzing) {
 			runMultiImageAnalysis(files);
@@ -72,9 +73,30 @@ export default function AddListing() {
 			const data = await res.json();
 			if (data && !data.error) {
 				setAiAnalysis(data);
-				// Auto-fill the form if the user hasn't typed anything yet
-				if (!title) setTitle(data.detected_item);
-				console.log("AI analysis successful");
+				// Auto‑fill title and description if they're empty
+				if (!title) setTitle(data.title || data.detected_item || "");
+				if (!description) {
+					// Combine description and appearance into one text block
+					const fullDescription = `${data.description || ""}\n\nAppearance: ${data.appearance || ""}`;
+					setDescription(fullDescription.trim());
+				}
+				// Optional: also pre‑fill category if the AI returned a valid one
+				if (data.category) {
+					const validCategories = [
+						"Agriculture",
+						"Fashion",
+						"Home Service",
+						"Handmade",
+						"Electronics",
+						"Home & Garden",
+						"Toys & Games",
+						"Sports & Outdoors",
+						"Beauty & Health",
+					];
+					if (validCategories.includes(data.category)) {
+						setCategory(data.category);
+					}
+				}
 			}
 		} catch (err) {
 			console.error("AI Analysis failed:", err);
@@ -148,6 +170,7 @@ export default function AddListing() {
 			const { error } = await supabase.from("listings").insert([
 				{
 					title: title,
+					description: description, // <-- NEW
 					price: e.target.price.value,
 					phone: e.target.phone.value,
 					category: category,
@@ -155,10 +178,13 @@ export default function AddListing() {
 					latitude: selectedPos?.lat || null,
 					longitude: selectedPos?.lng || null,
 					user_id: getDeviceId(),
-					ai_detected_item: aiAnalysis?.detected_item || null,
-					ai_condition_report: aiAnalysis?.condition_assessment || null,
-					ai_condition_score: aiAnalysis?.condition_score || null,
-					is_verified: aiAnalysis?.is_safe || false,
+					ai_detected_item:
+						aiAnalysis?.title || aiAnalysis?.detected_item || null,
+					ai_condition_report: aiAnalysis?.condition || null,
+					ai_condition_score: null, // Not used in new response; you can map condition to a score if needed
+					is_verified:
+						aiAnalysis?.condition === "New" ||
+						aiAnalysis?.condition === "Like New",
 				},
 			]);
 
@@ -264,6 +290,34 @@ export default function AddListing() {
 						</div>
 					</div>
 
+					{/* NEW: Description Field */}
+					<div className="space-y-1">
+						<label className="text-xs font-bold text-gray-500 uppercase ml-1">
+							Description
+						</label>
+						<div className="relative">
+							<textarea
+								value={description}
+								onChange={(e) => setDescription(e.target.value)}
+								name="description"
+								placeholder="Describe your item... (AI will help!)"
+								rows={4}
+								className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all resize-none"
+							/>
+							{aiAnalysis && description && (
+								<Sparkles
+									size={18}
+									className="absolute right-4 top-4 text-blue-400 pointer-events-none"
+								/>
+							)}
+						</div>
+						{aiAnalysis?.appearance && (
+							<p className="text-xs text-gray-400 mt-1 ml-2">
+								AI detected: {aiAnalysis.appearance.substring(0, 60)}...
+							</p>
+						)}
+					</div>
+
 					<div className="grid grid-cols-2 gap-4">
 						<div className="space-y-1">
 							<label className="text-xs font-bold text-gray-500 uppercase ml-1">
@@ -292,6 +346,11 @@ export default function AddListing() {
 								<option>Home Service</option>
 								<option>Handmade</option>
 								<option>Electronics</option>
+								<option>Home & Garden</option>
+								<option>Toys & Games</option>
+								<option>Sports & Outdoors</option>
+								<option>Beauty & Health</option>
+								<option>Other</option>
 							</select>
 						</div>
 					</div>
@@ -319,7 +378,11 @@ export default function AddListing() {
 
 				<button
 					disabled={loading}
-					className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-xl ${loading ? "bg-gray-300 text-gray-500" : "bg-green-600 hover:bg-green-700 active:scale-95 text-white shadow-green-200"}`}
+					className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-xl ${
+						loading
+							? "bg-gray-300 text-gray-500"
+							: "bg-green-600 hover:bg-green-700 active:scale-95 text-white shadow-green-200"
+					}`}
 				>
 					{loading ? <Loader2 className="animate-spin" /> : "Publish Listing"}
 				</button>
