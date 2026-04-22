@@ -1,0 +1,60 @@
+"use client";
+
+import { useState } from "react";
+import { login } from "../actions/auth";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+
+export default function LoginPage() {
+	const router = useRouter();
+	const [error, setError] = useState("");
+
+	async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+		event.preventDefault();
+		const formData = new FormData(event.currentTarget);
+		const result = await login(formData);
+		if (result.error) {
+			setError(JSON.stringify(result.error));
+		} else if (result.redirectTo) {
+			router.push(result.redirectTo);
+		}
+	}
+
+	return (
+		<div className="max-w-md mx-auto mt-10 p-6 border rounded">
+			<h1 className="text-2xl font-bold mb-4">Login</h1>
+			<form onSubmit={handleSubmit} className="space-y-4">
+				<div>
+					<label className="block text-sm font-medium">Username</label>
+					<input
+						name="username"
+						required
+						className="w-full border p-2 rounded"
+					/>
+				</div>
+				<div>
+					<label className="block text-sm font-medium">Password</label>
+					<input
+						name="password"
+						type="password"
+						required
+						className="w-full border p-2 rounded"
+					/>
+				</div>
+				<button
+					type="submit"
+					className="w-full bg-blue-600 text-white py-2 rounded"
+				>
+					Login
+				</button>
+			</form>
+			{error && <p className="text-red-600 mt-2">{error}</p>}
+			<p className="mt-4 text-sm">
+				Don't have an account?{" "}
+				<Link href="/signup" className="text-blue-600">
+					Sign up
+				</Link>
+			</p>
+		</div>
+	);
+}
