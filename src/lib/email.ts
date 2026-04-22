@@ -11,7 +11,6 @@ const transporter = nodemailer.createTransport({
 export async function sendVerificationEmail(to: string, token: string) {
 	const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 	const verificationLink = `${baseUrl}/api/verify-email?token=${token}`;
-
 	await transporter.sendMail({
 		from: `"NepConnect" <${process.env.GMAIL_USER}>`,
 		to,

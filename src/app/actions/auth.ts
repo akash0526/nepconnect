@@ -71,8 +71,7 @@ export async function signup(formData: FormData) {
 	const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
 	// ✅ Pass the base URL to the email function
-	await sendVerificationEmail(email, email_verification_token, baseUrl);
-
+	await sendVerificationEmail(email, email_verification_token);
 	return { success: true, message: "User created! Please verify your email." };
 }
 
