@@ -9,9 +9,17 @@ export async function middleware(request: NextRequest) {
 	const isPublicRoute =
 		pathname === "/login" ||
 		pathname === "/signup" ||
+		pathname === "/" ||
+		pathname.startsWith("/product/") ||
 		pathname === "/api/verify-email";
 
-	if (!token && !isPublicRoute) {
+	// Protected routes that always require auth
+	const isProtectedRoute =
+		pathname === "/dashboard" ||
+		pathname === "/add-listing" ||
+		pathname.startsWith("/account");
+
+	if (!token && isProtectedRoute) {
 		const url = new URL("/login", request.url);
 		url.searchParams.set("callbackUrl", pathname);
 		return NextResponse.redirect(url);
@@ -21,7 +29,8 @@ export async function middleware(request: NextRequest) {
 		try {
 			const secret = new TextEncoder().encode(process.env.JWT_SECRET);
 			await jwtVerify(token, secret);
-			if (isPublicRoute) {
+			// Redirect logged-in users away from login/signup
+			if (pathname === "/login" || pathname === "/signup") {
 				return NextResponse.redirect(new URL("/dashboard", request.url));
 			}
 			return NextResponse.next();

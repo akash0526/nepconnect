@@ -13,6 +13,7 @@ import {
 	X,
 	ChevronLeft,
 	ChevronRight,
+	LogIn,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -29,11 +30,27 @@ export default function Home() {
 	const [items, setItems] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [searchQuery, setSearchQuery] = useState("");
+	const [isGuest, setIsGuest] = useState(true);
 	const myId = getDeviceId();
 
 	const [selectedDescription, setSelectedDescription] = useState(null);
 	const [galleryImages, setGalleryImages] = useState([]);
 	const [galleryIndex, setGalleryIndex] = useState(0);
+
+	// Check if user is authenticated
+	useEffect(() => {
+		const checkAuth = async () => {
+			const res = await fetch("/api/me", { credentials: "include" }).catch(
+				() => null,
+			);
+			if (res && res.ok) {
+				setIsGuest(false);
+			} else {
+				setIsGuest(true);
+			}
+		};
+		checkAuth();
+	}, []);
 
 	const handleDelete = async (id) => {
 		if (
@@ -118,8 +135,30 @@ export default function Home() {
 				</div>
 			</div>
 
+			{/* Guest Banner */}
+			{isGuest && (
+				<div className="max-w-xl mx-auto px-4 mt-4">
+					<div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
+						<div>
+							<p className="text-sm font-semibold text-amber-800">
+								Browsing as Guest
+							</p>
+							<p className="text-xs text-amber-600 mt-0.5">
+								Login to sell items, save favourites & more
+							</p>
+						</div>
+						<Link
+							href="/login"
+							className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded-xl transition whitespace-nowrap"
+						>
+							<LogIn size={13} /> Login
+						</Link>
+					</div>
+				</div>
+			)}
+
 			<div className="p-4 max-w-xl mx-auto -mt-8">
-				<div className="rounded-3xl overflow-hidden shadow-xl border-4 border-white mb-8 bg-white h-[300px]">
+				<div className="rounded-3xl overflow-hidden shadow-xl border-4 border-white mb-8 bg-white h-[300px] mt-12">
 					<Map listings={filteredItems} />
 				</div>
 
@@ -145,13 +184,16 @@ export default function Home() {
 										? [item.image_url]
 										: [];
 
+							// Only show delete button if logged in AND owner
+							const isOwner = !isGuest && item.user_id === myId;
+
 							return (
 								<Link
 									href={`/product/${item.id}`}
 									key={item.id}
 									className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex flex-row h-auto min-h-48 hover:shadow-md transition-shadow relative"
 								>
-									{item.user_id === myId && (
+									{isOwner && (
 										<button
 											onClick={(e) => {
 												e.preventDefault();
@@ -219,7 +261,6 @@ export default function Home() {
 											)}
 										</div>
 
-										{/* ACTION BUTTONS - BUTTONS NOT LINKS */}
 										<div className="flex gap-2 mt-3">
 											<button
 												onClick={(e) => {
@@ -254,12 +295,22 @@ export default function Home() {
 				</div>
 			</div>
 
-			<Link
-				href="/add-listing"
-				className="fixed bottom-8 right-6 bg-green-600 text-white p-5 rounded-2xl shadow-2xl hover:scale-110 active:scale-95 transition-all z-50"
-			>
-				<Plus size={28} />
-			</Link>
+			{/* FAB — show login prompt for guests */}
+			{isGuest ? (
+				<Link
+					href="/login"
+					className="fixed bottom-8 right-6 bg-blue-600 text-white p-5 rounded-2xl shadow-2xl hover:scale-110 active:scale-95 transition-all z-50 flex items-center gap-2 text-sm font-bold"
+				>
+					<LogIn size={22} /> Login to Sell
+				</Link>
+			) : (
+				<Link
+					href="/add-listing"
+					className="fixed bottom-8 right-6 bg-green-600 text-white p-5 rounded-2xl shadow-2xl hover:scale-110 active:scale-95 transition-all z-50"
+				>
+					<Plus size={28} />
+				</Link>
+			)}
 
 			{selectedDescription && (
 				<div
