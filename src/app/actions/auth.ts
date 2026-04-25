@@ -38,7 +38,6 @@ export async function signup(formData: FormData) {
 
 	const { username, email, phone_number, password } = validatedFields.data;
 
-	// Check if user exists
 	const { data: existing } = await supabase
 		.from("users")
 		.select("username, email")
@@ -49,11 +48,9 @@ export async function signup(formData: FormData) {
 		return { error: "Username or email already exists" };
 	}
 
-	// Hash password
 	const password_hash = await bcrypt.hash(password, 12);
 	const email_verification_token = randomBytes(32).toString("hex");
 
-	// Insert user
 	const { error: insertError } = await supabase.from("users").insert({
 		username,
 		email,
@@ -67,10 +64,6 @@ export async function signup(formData: FormData) {
 		return { error: "Failed to create user" };
 	}
 
-	// ✅ FIX: Get the base URL from environment (with a fallback)
-	const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-
-	// ✅ Pass the base URL to the email function
 	await sendVerificationEmail(email, email_verification_token);
 	return { success: true, message: "User created! Please verify your email." };
 }
@@ -79,24 +72,25 @@ export async function signup(formData: FormData) {
 const LoginSchema = z.object({
 	username: z.string().min(1, "Username required"),
 	password: z.string().min(1, "Password required"),
+	device_id: z.string().optional(),
 });
 
 export async function login(formData: FormData) {
 	const validatedFields = LoginSchema.safeParse({
 		username: formData.get("username"),
 		password: formData.get("password"),
+		device_id: formData.get("device_id") || undefined,
 	});
 
 	if (!validatedFields.success) {
 		return { error: validatedFields.error.flatten().fieldErrors };
 	}
 
-	const { username, password } = validatedFields.data;
+	const { username, password, device_id } = validatedFields.data;
 
-	// Find user by username
 	const { data: user, error } = await supabase
 		.from("users")
-		.select("id, username, email, password_hash, email_verified")
+		.select("id, username, email, password_hash, email_verified, device_id")
 		.eq("username", username)
 		.maybeSingle();
 
@@ -104,7 +98,6 @@ export async function login(formData: FormData) {
 		return { error: "Invalid username or password" };
 	}
 
-	// Verify password
 	const isValid = await bcrypt.compare(password, user.password_hash);
 	if (!isValid) {
 		return { error: "Invalid username or password" };
@@ -114,14 +107,28 @@ export async function login(formData: FormData) {
 		return { error: "Please verify your email before logging in" };
 	}
 
-	// Create JWT
+	// Save the device_id to the user record so listings (stored with user_id = device_id)
+	// can be associated with this account. Only update if a device_id was sent and it's
+	// different from what's already stored — avoids unnecessary writes.
+	const resolvedDeviceId = device_id || user.device_id || null;
+	if (device_id && device_id !== user.device_id) {
+		await supabase
+			.from("users")
+			.update({ device_id, updated_at: new Date().toISOString() })
+			.eq("id", user.id);
+	}
+
+	// Include device_id in JWT so /api/me can return it to client components
 	const secret = new TextEncoder().encode(process.env.JWT_SECRET!);
-	const token = await new SignJWT({ userId: user.id, username: user.username })
+	const token = await new SignJWT({
+		userId: user.id,
+		username: user.username,
+		deviceId: resolvedDeviceId,
+	})
 		.setProtectedHeader({ alg: "HS256" })
 		.setExpirationTime("7d")
 		.sign(secret);
 
-	// Set cookie - dynamically import cookies()
 	const { cookies } = await import("next/headers");
 	(await cookies()).set("session_token", token, {
 		httpOnly: true,

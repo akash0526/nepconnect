@@ -1,20 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { login } from "../actions/auth";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { getDeviceId } from "../../lib/supabase";
 
 export default function LoginPage() {
 	const router = useRouter();
 	const [error, setError] = useState("");
+	const [deviceId, setDeviceId] = useState("");
+
+	// Read device ID client-side (it lives in localStorage)
+	useEffect(() => {
+		setDeviceId(getDeviceId());
+	}, []);
 
 	async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
 		const formData = new FormData(event.currentTarget);
+		// Inject device_id so the server action can save it to users.device_id
+		formData.set("device_id", deviceId);
 		const result = await login(formData);
 		if (result.error) {
-			setError(JSON.stringify(result.error));
+			setError(
+				typeof result.error === "string"
+					? result.error
+					: JSON.stringify(result.error),
+			);
 		} else if (result.redirectTo) {
 			router.push(result.redirectTo);
 		}
@@ -41,6 +54,8 @@ export default function LoginPage() {
 						className="w-full border p-2 rounded"
 					/>
 				</div>
+				{/* Hidden — sent to server so device_id is linked to the account */}
+				<input type="hidden" name="device_id" value={deviceId} />
 				<button
 					type="submit"
 					className="w-full bg-blue-600 text-white py-2 rounded"
