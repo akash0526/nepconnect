@@ -9,11 +9,15 @@ import { getDeviceId } from "../../lib/supabase";
 export default function LoginPage() {
 	const router = useRouter();
 	const [error, setError] = useState("");
-	const [deviceId, setDeviceId] = useState("");
+	// const [deviceId, setDeviceId] = useState("");
 
-	// Read device ID client-side (it lives in localStorage)
+	// // Read device ID client-side (it lives in localStorage)
+	// useEffect(() => {
+	// 	setDeviceId(getDeviceId());
+	// }, []);
+	const [deviceId, setDeviceId] = useState("");
 	useEffect(() => {
-		setDeviceId(getDeviceId());
+		setDeviceId(getDeviceId() ?? "");
 	}, []);
 
 	async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
