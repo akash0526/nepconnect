@@ -2,7 +2,6 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import { Loader2, Info, Ruler, X } from "lucide-react";
-import L from "leaflet";
 import { speakNepali } from "../../../lib/speak";
 
 const FieldMap = dynamic(() => import("../../../components/FieldMap"), {
@@ -14,7 +13,7 @@ const FieldMap = dynamic(() => import("../../../components/FieldMap"), {
 	),
 });
 
-// SoilGrids data → simple soil type (Nepali)
+// Soil helper
 const getSimpleSoil = (soilData) => {
 	if (!soilData) return null;
 	const clay = parseFloat(soilData["Clay (%)"]) || 0;
@@ -32,18 +31,15 @@ const getSimpleSoil = (soilData) => {
 		type = "गाड";
 		icon = "🟠";
 	}
-
 	const messageMap = {
 		बालुवा: "बालुवा माटो – पानी छिट्टै बग्छ, धेरै सिँचाइ आवश्यक।",
 		हिलो: "हिलो माटो – पानी जम्मा हुनसक्छ, राम्रो निकास जरुरी।",
 		गाड: "गाड माटो – मलिलो, पानी राम्ररी राख्छ।",
 		दोमट: "दोमट माटो – उत्तम! पानी र हावा दुवै राम्रोसँग रहन्छ।",
 	};
-
 	return { type, icon, message: messageMap[type] };
 };
 
-// Convert hectares to ropani (approximate)
 const haToRopani = (ha) => {
 	const value = parseFloat(ha);
 	if (isNaN(value)) return null;
@@ -96,8 +92,10 @@ export default function FieldMonitor() {
 		const latlngs = e.layer.getLatLngs()[0];
 		let area = 0;
 		try {
-			area = L.GeometryUtil?.geodesicArea?.(latlngs) / 10000; // hectares
-		} catch {
+			// Use window.L which is available after the map loads on the client
+			area = window.L.GeometryUtil.geodesicArea(latlngs) / 10000; // hectares
+		} catch (err) {
+			console.error("Area calculation failed:", err);
 			area = 0;
 		}
 		setFieldArea(area.toFixed(2));
