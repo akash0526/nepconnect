@@ -3,11 +3,31 @@ import { createClient } from "@supabase/supabase-js";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-	throw new Error("Missing Supabase environment variables");
+// Lazy init — don't throw at module evaluation time, so static pages can build
+let _supabase = null;
+
+export function getSupabase() {
+	if (!_supabase) {
+		if (!supabaseUrl || !supabaseAnonKey) {
+			// Return a mock client for build-time / SSR to prevent crashes
+			if (typeof window === "undefined") {
+				return createClient(
+					"https://placeholder.supabase.co",
+					"placeholder-key",
+				);
+			}
+			throw new Error("Missing Supabase environment variables");
+		}
+		_supabase = createClient(supabaseUrl, supabaseAnonKey);
+	}
+	return _supabase;
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// For convenience in client components
+export const supabase =
+	typeof window !== "undefined"
+		? getSupabase()
+		: createClient("https://placeholder.supabase.co", "placeholder-key");
 
 // ── Device ID helpers ──
 export const getDeviceId = () => {
@@ -94,9 +114,11 @@ export const DB = {
 			await supabase.from("favorites").delete().eq("id", existing.id);
 			return { favorited: false };
 		} else {
-			await supabase.from("favorites").insert([
-				{ user_id: userId, listing_id: listingId, device_id: deviceId },
-			]);
+			await supabase
+				.from("favorites")
+				.insert([
+					{ user_id: userId, listing_id: listingId, device_id: deviceId },
+				]);
 			return { favorited: true };
 		}
 	},
@@ -114,9 +136,9 @@ export const DB = {
 			await supabase.from("favorites").delete().eq("id", existing.id);
 			return { favorited: false };
 		} else {
-			await supabase.from("favorites").insert([
-				{ device_id: deviceId, listing_id: listingId },
-			]);
+			await supabase
+				.from("favorites")
+				.insert([{ device_id: deviceId, listing_id: listingId }]);
 			return { favorited: true };
 		}
 	},
@@ -241,13 +263,18 @@ export const DB = {
 
 		if (error) throw error;
 
-		return (data || []).filter((item) => {
-			if (!item.latitude || !item.longitude) return false;
-			return getDistance(lat, lng, item.latitude, item.longitude) <= radiusKm;
-		}).map((item) => ({
-			...item,
-			distance_km: Math.round(getDistance(lat, lng, item.latitude, item.longitude) * 10) / 10,
-		}));
+		return (data || [])
+			.filter((item) => {
+				if (!item.latitude || !item.longitude) return false;
+				return getDistance(lat, lng, item.latitude, item.longitude) <= radiusKm;
+			})
+			.map((item) => ({
+				...item,
+				distance_km:
+					Math.round(
+						getDistance(lat, lng, item.latitude, item.longitude) * 10,
+					) / 10,
+			}));
 	},
 
 	// ── Messages / Conversations ──
@@ -264,12 +291,14 @@ export const DB = {
 
 		const { data, error } = await supabase
 			.from("conversations")
-			.insert([{
-				listing_id: listingId,
-				buyer_id: buyerId,
-				buyer_device_id: buyerDeviceId,
-				seller_id: sellerId,
-			}])
+			.insert([
+				{
+					listing_id: listingId,
+					buyer_id: buyerId,
+					buyer_device_id: buyerDeviceId,
+					seller_id: sellerId,
+				},
+			])
 			.select()
 			.single();
 
@@ -280,12 +309,14 @@ export const DB = {
 	async sendMessage(conversationId, senderId, senderDeviceId, text) {
 		const { data, error } = await supabase
 			.from("messages")
-			.insert([{
-				conversation_id: conversationId,
-				sender_id: senderId,
-				sender_device_id: senderDeviceId,
-				text,
-			}])
+			.insert([
+				{
+					conversation_id: conversationId,
+					sender_id: senderId,
+					sender_device_id: senderDeviceId,
+					text,
+				},
+			])
 			.select()
 			.single();
 
@@ -302,7 +333,9 @@ export const DB = {
 	async getConversations(userId, deviceId) {
 		let query = supabase
 			.from("conversations")
-			.select("*, listing:listing_id (id, title, price, image_urls), messages(*)");
+			.select(
+				"*, listing:listing_id (id, title, price, image_urls), messages(*)",
+			);
 
 		if (userId) {
 			query = query.or(`buyer_id.eq.${userId},seller_id.eq.${userId}`);
@@ -310,7 +343,9 @@ export const DB = {
 			query = query.eq("buyer_device_id", deviceId);
 		}
 
-		const { data, error } = await query.order("last_message_at", { ascending: false });
+		const { data, error } = await query.order("last_message_at", {
+			ascending: false,
+		});
 		if (error) throw error;
 		return data || [];
 	},

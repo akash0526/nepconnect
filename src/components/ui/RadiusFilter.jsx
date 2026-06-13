@@ -11,7 +11,11 @@ const RADII = [
 	{ value: 50, label: "50 km" },
 ];
 
-export default function RadiusFilter({ onRadiusChange, onLocationItems, currentRadius }) {
+export default function RadiusFilter({
+	onRadiusChange,
+	onLocationItems,
+	currentRadius,
+}) {
 	const [radius, setRadius] = useState(currentRadius || 0);
 	const [userLocation, setUserLocation] = useState(null);
 	const [gettingLocation, setGettingLocation] = useState(false);
@@ -29,13 +33,12 @@ export default function RadiusFilter({ onRadiusChange, onLocationItems, currentR
 			async (position) => {
 				const { latitude, longitude } = position.coords;
 				setUserLocation({ lat: latitude, lng: longitude });
-
 				if (radius > 0) {
 					await fetchNearby(latitude, longitude, radius);
 				}
 				setGettingLocation(false);
 			},
-			(err) => {
+			() => {
 				setError("Could not get location. Please enable GPS.");
 				setGettingLocation(false);
 			},
@@ -44,7 +47,6 @@ export default function RadiusFilter({ onRadiusChange, onLocationItems, currentR
 	};
 
 	const fetchNearby = async (lat, lng, rad) => {
-		// Approximate bounding box
 		const latDelta = rad / 111;
 		const lngDelta = rad / (111 * Math.cos((lat * Math.PI) / 180));
 
@@ -59,16 +61,18 @@ export default function RadiusFilter({ onRadiusChange, onLocationItems, currentR
 			.order("created_at", { ascending: false });
 
 		if (!error && data) {
-			// Filter by actual haversine distance
-			const nearby = data.filter((item) => {
-				if (!item.latitude || !item.longitude) return false;
-				const dist = getDistance(lat, lng, item.latitude, item.longitude);
-				return dist <= rad;
-			}).map((item) => {
-				const dist = getDistance(lat, lng, item.latitude, item.longitude);
-				return { ...item, distance_km: Math.round(dist * 10) / 10 };
-			});
-
+			const nearby = data
+				.filter((item) => {
+					if (!item.latitude || !item.longitude) return false;
+					return getDistance(lat, lng, item.latitude, item.longitude) <= rad;
+				})
+				.map((item) => ({
+					...item,
+					distance_km:
+						Math.round(
+							getDistance(lat, lng, item.latitude, item.longitude) * 10,
+						) / 10,
+				}));
 			onLocationItems?.(nearby);
 		}
 	};
@@ -81,16 +85,20 @@ export default function RadiusFilter({ onRadiusChange, onLocationItems, currentR
 		}
 	};
 
+	const hasLocation = !!userLocation;
+	const isGetting = !!gettingLocation;
+	const errorMsg = error;
+
 	return (
-		<div className="flex items-center gap-2 mb-4">
-			<MapPin size={14} className="text-[var(--color-primary)]" />
+		<div className="flex flex-wrap items-center gap-2 mb-4">
+			<MapPin size={14} className="text-[var(--color-primary)] flex-shrink-0" />
 
 			<div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
 				{RADII.map((r) => (
 					<button
 						key={r.value}
 						onClick={() => handleRadiusChange(r.value)}
-						className={`px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all ${
+						className={`px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all flex-shrink-0 ${
 							radius === r.value
 								? "bg-[var(--color-primary)] text-white shadow-sm"
 								: "bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200"
@@ -103,23 +111,25 @@ export default function RadiusFilter({ onRadiusChange, onLocationItems, currentR
 
 			<button
 				onClick={getLocation}
-				disabled={gettingLocation}
-				className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all ${
-					userLocation
+				disabled={isGetting}
+				className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all flex-shrink-0 ${
+					hasLocation
 						? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
 						: "bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400"
 				}`}
 				title="Use my location"
 			>
-				{gettingLocation ? (
+				{isGetting ? (
 					<Loader2 size={12} className="animate-spin" />
 				) : (
 					<Navigation size={12} />
 				)}
-				{userLocation ? "📍" : "GPS"}
+				<span>{hasLocation ? "📍" : "GPS"}</span>
 			</button>
 
-			{error && <p className="text-[10px] text-red-500">{error}</p>}
+			{errorMsg.length > 0 && (
+				<p className="w-full text-[10px] text-red-500 mt-0.5">{errorMsg}</p>
+			)}
 		</div>
 	);
 }
