@@ -17,6 +17,11 @@ import {
 	Sparkles,
 	Tag,
 	Clock,
+	User as UserIcon,
+	BarChart3,
+	AlertCircle,
+	Settings,
+	ChevronRight,
 } from "lucide-react";
 
 type Listing = {
@@ -45,9 +50,7 @@ export default function Dashboard() {
 	const [loadingUser, setLoadingUser] = useState(true);
 	const [loadingListings, setLoadingListings] = useState(true);
 	const [deleting, setDeleting] = useState<string | null>(null);
-	const [activeTab, setActiveTab] = useState<"listings" | "sell">("listings");
 
-	// device_id is stored in the JWT at login time — it matches user_id on listings
 	useEffect(() => {
 		fetch("/api/me")
 			.then((r) => r.json())
@@ -61,7 +64,6 @@ export default function Dashboard() {
 				if (data.user.deviceId) {
 					loadListings(data.user.deviceId);
 				} else {
-					// No device_id linked yet — user must log out and back in
 					setLoadingListings(false);
 				}
 			})
@@ -100,35 +102,13 @@ export default function Dashboard() {
 	const thumb = (item: Listing) =>
 		item.image_urls?.length ? item.image_urls[0] : item.image_url || null;
 
-	const conditionStyle = (c?: string): { bg: string; color: string } => {
-		const map: Record<string, { bg: string; color: string }> = {
-			New: { bg: "#eaf3de", color: "#27500a" },
-			"Like New": { bg: "#eaf3de", color: "#27500a" },
-			Good: { bg: "#faeeda", color: "#633806" },
-			Fair: { bg: "#faece7", color: "#712b13" },
-			"For Parts": { bg: "#fcebeb", color: "#791f1f" },
-		};
-		return c
-			? (map[c] ?? {
-					bg: "var(--color-background-secondary)",
-					color: "var(--color-text-secondary)",
-				})
-			: {
-					bg: "var(--color-background-secondary)",
-					color: "var(--color-text-secondary)",
-				};
-	};
-
 	const timeAgo = (d: string) => {
 		const days = Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
 		if (days === 0) return "Today";
 		if (days === 1) return "Yesterday";
 		if (days < 7) return `${days}d ago`;
 		if (days < 30) return `${Math.floor(days / 7)}w ago`;
-		return new Date(d).toLocaleDateString("en-US", {
-			month: "short",
-			day: "numeric",
-		});
+		return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 	};
 
 	const initials = user?.username?.slice(0, 2).toUpperCase() ?? "..";
@@ -136,714 +116,251 @@ export default function Dashboard() {
 	const totalValue = listings.reduce((s, l) => s + (l.price || 0), 0);
 
 	return (
-		<main
-			style={{
-				minHeight: "100vh",
-				background: "var(--color-background-tertiary)",
-				paddingBottom: "6rem",
-			}}
-		>
-			<style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap');
-        .d { font-family: 'Sora', var(--font-sans); }
-        .lcard { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); overflow: hidden; transition: border-color 0.15s; }
-        .lcard:hover { border-color: var(--color-border-secondary); }
-        .tbtn { background: none; border: none; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600; padding: 7px 16px; border-radius: 100px; transition: background 0.15s, color 0.15s; color: var(--color-text-secondary); }
-        .tbtn.on { background: var(--color-background-primary); color: var(--color-text-primary); border: 0.5px solid var(--color-border-secondary); }
-        .dbtn { background: none; border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 5px 7px; cursor: pointer; color: var(--color-text-tertiary); display: flex; align-items: center; transition: all 0.15s; flex-shrink: 0; }
-        .dbtn:hover { background: var(--color-background-danger); color: var(--color-text-danger); border-color: var(--color-border-danger); }
-        .abtn { flex: 1; padding: 7px 0; border-radius: var(--border-radius-md); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 4px; border: 0.5px solid var(--color-border-tertiary); background: none; cursor: pointer; color: var(--color-text-secondary); font-family: inherit; transition: background 0.15s; }
-        .abtn.c { color: var(--color-text-info); border-color: var(--color-border-info); }
-        .abtn.c:hover { background: var(--color-background-info); }
-        .abtn.w { color: var(--color-text-success); border-color: var(--color-border-success); }
-        .abtn.w:hover { background: var(--color-background-success); }
-        .logbtn { display: flex; align-items: center; gap: 6px; background: none; border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 7px 13px; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--color-text-secondary); font-family: inherit; transition: all 0.15s; }
-        .logbtn:hover { background: var(--color-background-danger); color: var(--color-text-danger); border-color: var(--color-border-danger); }
-        @keyframes fu { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-        .fu { animation: fu 0.3s ease both; }
-        @keyframes sp { to { transform: rotate(360deg); } }
-        .sp { width:18px; height:18px; border:2px solid var(--color-border-secondary); border-top-color:var(--color-text-secondary); border-radius:50%; animation: sp 0.7s linear infinite; }
-      `}</style>
-
-			<div className="d">
-				{/* Header */}
-				<div
-					style={{
-						background: "var(--color-background-primary)",
-						borderBottom: "0.5px solid var(--color-border-tertiary)",
-						padding: "1.25rem",
-						maxWidth: 560,
-						margin: "0 auto",
-					}}
-				>
-					<div
-						style={{
-							display: "flex",
-							alignItems: "center",
-							justifyContent: "space-between",
-						}}
-					>
-						<div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-							<div
-								style={{
-									width: 44,
-									height: 44,
-									borderRadius: 13,
-									background: "#639922",
-									display: "flex",
-									alignItems: "center",
-									justifyContent: "center",
-									color: "#eaf3de",
-									fontSize: 15,
-									fontWeight: 700,
-									flexShrink: 0,
-								}}
-							>
+		<div className="pb-24">
+			{/* Header / Profile */}
+			<div className="bg-gradient-to-br from-green-600 via-emerald-700 to-green-800 rounded-3xl p-6 pt-8 pb-10 text-white shadow-xl -mx-4 mb-6 relative overflow-hidden">
+				<div className="absolute -top-10 -right-10 w-48 h-48 bg-white/5 rounded-full" />
+				<div className="absolute -bottom-8 -left-8 w-36 h-36 bg-white/5 rounded-full" />
+				<div className="relative z-10">
+					<div className="flex items-center justify-between">
+						<div className="flex items-center gap-4">
+							<div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-xl font-black">
 								{initials}
 							</div>
 							<div>
-								<p
-									style={{
-										margin: 0,
-										fontSize: 10,
-										fontWeight: 700,
-										letterSpacing: 0.8,
-										textTransform: "uppercase",
-										color: "var(--color-text-tertiary)",
-									}}
-								>
-									Dashboard
-								</p>
-								<p
-									style={{
-										margin: 0,
-										fontSize: 16,
-										fontWeight: 700,
-										color: "var(--color-text-primary)",
-										lineHeight: 1.2,
-									}}
-								>
-									{loadingUser ? "…" : user?.username}
-								</p>
+								<p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Dashboard</p>
+								<h1 className="text-xl font-black tracking-tight">
+									{loadingUser ? "..." : user?.username}
+								</h1>
 							</div>
 						</div>
-						<button className="logbtn" onClick={handleLogout}>
-							<LogOut size={12} /> Sign out
-						</button>
-					</div>
-				</div>
-
-				<div style={{ maxWidth: 560, margin: "0 auto", padding: "1.25rem" }}>
-					{/* Stats */}
-					<div
-						className="fu"
-						style={{
-							display: "grid",
-							gridTemplateColumns: "repeat(2, minmax(0,1fr))",
-							gap: 10,
-							marginBottom: 16,
-						}}
-					>
-						{[
-							{
-								icon: <Package size={12} />,
-								label: "Active",
-								value: String(listings.length),
-								color: "var(--color-text-primary)",
-							},
-							{
-								icon: <Tag size={12} />,
-								label: "Total Value",
-								value: `NPR ${totalValue.toLocaleString()}`,
-								color: "#3b6d11",
-							},
-						].map(({ icon, label, value, color }) => (
-							<div
-								key={label}
-								style={{
-									background: "var(--color-background-primary)",
-									border: "0.5px solid var(--color-border-tertiary)",
-									borderRadius: "var(--border-radius-lg)",
-									padding: "13px 15px",
-								}}
-							>
-								<p
-									style={{
-										margin: "0 0 5px",
-										fontSize: 11,
-										fontWeight: 600,
-										letterSpacing: 0.5,
-										textTransform: "uppercase",
-										color: "var(--color-text-tertiary)",
-										display: "flex",
-										alignItems: "center",
-										gap: 5,
-									}}
-								>
-									{icon} {label}
-								</p>
-								<p
-									style={{
-										margin: 0,
-										fontSize: value.length > 10 ? 15 : 26,
-										fontWeight: 800,
-										color,
-										lineHeight: 1,
-									}}
-								>
-									{value}
-								</p>
-							</div>
-						))}
-					</div>
-
-					{/* Verified badge */}
-					{!loadingListings && verified > 0 && (
-						<div
-							className="fu"
-							style={{
-								animationDelay: "0.05s",
-								background: "#eaf3de",
-								border: "0.5px solid #c0dd97",
-								borderRadius: "var(--border-radius-lg)",
-								padding: "10px 14px",
-								display: "flex",
-								alignItems: "center",
-								gap: 9,
-								marginBottom: 16,
-							}}
-						>
-							<ShieldCheck
-								size={14}
-								color="#3b6d11"
-								style={{ flexShrink: 0 }}
-							/>
-							<span style={{ fontSize: 12, fontWeight: 600, color: "#27500a" }}>
-								{verified} listing{verified > 1 ? "s" : ""} AI-verified — buyers
-								trust these more
-							</span>
-						</div>
-					)}
-
-					{/* Tabs */}
-					<div
-						className="fu"
-						style={{
-							animationDelay: "0.07s",
-							display: "flex",
-							gap: 5,
-							background: "var(--color-background-secondary)",
-							borderRadius: 100,
-							padding: 3,
-							marginBottom: 16,
-						}}
-					>
 						<button
-							className={`tbtn ${activeTab === "listings" ? "on" : ""}`}
-							onClick={() => setActiveTab("listings")}
+							onClick={handleLogout}
+							className="bg-white/15 hover:bg-white/25 backdrop-blur-sm px-3.5 py-2 rounded-xl flex items-center gap-1.5 text-xs font-bold transition"
 						>
-							My Listings {!loadingListings && `(${listings.length})`}
-						</button>
-						<button
-							className={`tbtn ${activeTab === "sell" ? "on" : ""}`}
-							onClick={() => setActiveTab("sell")}
-						>
-							+ Sell
+							<LogOut size={14} /> Sign out
 						</button>
 					</div>
-
-					{/* Listings tab */}
-					{activeTab === "listings" && (
-						<div className="fu" style={{ animationDelay: "0.09s" }}>
-							{loadingListings ? (
-								<div
-									style={{
-										display: "flex",
-										justifyContent: "center",
-										padding: "3rem 0",
-									}}
-								>
-									<div className="sp" style={{ width: 24, height: 24 }} />
-								</div>
-							) : listings.length === 0 ? (
-								<div
-									style={{
-										background: "var(--color-background-primary)",
-										border: "0.5px solid var(--color-border-tertiary)",
-										borderRadius: "var(--border-radius-lg)",
-										padding: "2.5rem 1.5rem",
-										textAlign: "center",
-									}}
-								>
-									<div
-										style={{
-											width: 46,
-											height: 46,
-											background: "#eaf3de",
-											borderRadius: 14,
-											display: "flex",
-											alignItems: "center",
-											justifyContent: "center",
-											margin: "0 auto 12px",
-										}}
-									>
-										<Package size={20} color="#3b6d11" />
-									</div>
-									<p
-										style={{
-											fontWeight: 700,
-											margin: "0 0 5px",
-											color: "var(--color-text-primary)",
-										}}
-									>
-										No listings yet
-									</p>
-									<p
-										style={{
-											fontSize: 13,
-											color: "var(--color-text-tertiary)",
-											margin: "0 0 18px",
-										}}
-									>
-										Post something and reach local buyers.
-									</p>
-									<Link
-										href="/add-listing"
-										style={{
-											display: "inline-flex",
-											alignItems: "center",
-											gap: 6,
-											background: "#639922",
-											color: "#eaf3de",
-											padding: "10px 22px",
-											borderRadius: "var(--border-radius-md)",
-											fontWeight: 700,
-											fontSize: 13,
-											textDecoration: "none",
-										}}
-									>
-										<Plus size={13} /> Create listing
-									</Link>
-								</div>
-							) : (
-								<div
-									style={{ display: "flex", flexDirection: "column", gap: 10 }}
-								>
-									{listings.map((item, i) => {
-										const img = thumb(item);
-										const cs = conditionStyle(item.ai_condition_report);
-										return (
-											<div
-												key={item.id}
-												className="lcard"
-												style={{ animationDelay: `${0.09 + i * 0.04}s` }}
-											>
-												<div style={{ display: "flex" }}>
-													{/* Image */}
-													<Link
-														href={`/product/${item.id}`}
-														style={{
-															flexShrink: 0,
-															display: "block",
-															position: "relative",
-															textDecoration: "none",
-														}}
-													>
-														{img ? (
-															<img
-																src={img}
-																alt={item.title}
-																style={{
-																	width: 88,
-																	height: 88,
-																	objectFit: "cover",
-																	display: "block",
-																}}
-															/>
-														) : (
-															<div
-																style={{
-																	width: 88,
-																	height: 88,
-																	display: "flex",
-																	alignItems: "center",
-																	justifyContent: "center",
-																	background:
-																		"var(--color-background-secondary)",
-																}}
-															>
-																<Package
-																	size={22}
-																	color="var(--color-text-tertiary)"
-																/>
-															</div>
-														)}
-														{item.is_verified && (
-															<div
-																style={{
-																	position: "absolute",
-																	top: 5,
-																	left: 5,
-																	background: "#185fa5",
-																	borderRadius: 5,
-																	padding: "2px 4px",
-																}}
-															>
-																<ShieldCheck size={9} color="#e6f1fb" />
-															</div>
-														)}
-														{(item.image_urls?.length ?? 0) > 1 && (
-															<div
-																style={{
-																	position: "absolute",
-																	bottom: 4,
-																	right: 4,
-																	background: "rgba(0,0,0,0.55)",
-																	borderRadius: 5,
-																	padding: "1px 5px",
-																	fontSize: 9,
-																	color: "#fff",
-																	fontWeight: 700,
-																}}
-															>
-																+{item.image_urls!.length - 1}
-															</div>
-														)}
-													</Link>
-
-													{/* Info */}
-													<div
-														style={{
-															flex: 1,
-															padding: "10px 11px",
-															display: "flex",
-															flexDirection: "column",
-															justifyContent: "space-between",
-															minWidth: 0,
-														}}
-													>
-														<div>
-															<div
-																style={{
-																	display: "flex",
-																	alignItems: "flex-start",
-																	gap: 6,
-																	justifyContent: "space-between",
-																}}
-															>
-																<Link
-																	href={`/product/${item.id}`}
-																	style={{
-																		fontWeight: 700,
-																		fontSize: 13,
-																		color: "var(--color-text-primary)",
-																		textDecoration: "none",
-																		lineHeight: 1.25,
-																		overflow: "hidden",
-																		display: "-webkit-box",
-																		WebkitLineClamp: 1,
-																		WebkitBoxOrient: "vertical",
-																	}}
-																>
-																	{item.title}
-																</Link>
-																<button
-																	className="dbtn"
-																	onClick={() => handleDelete(item.id)}
-																	disabled={deleting === item.id}
-																	title="Mark as sold"
-																>
-																	{deleting === item.id ? (
-																		<div className="sp" />
-																	) : (
-																		<Trash2 size={11} />
-																	)}
-																</button>
-															</div>
-
-															<p
-																style={{
-																	margin: "3px 0 6px",
-																	fontSize: 15,
-																	fontWeight: 800,
-																	color: "#3b6d11",
-																	lineHeight: 1,
-																}}
-															>
-																NPR {item.price?.toLocaleString()}
-															</p>
-
-															<div
-																style={{
-																	display: "flex",
-																	alignItems: "center",
-																	gap: 6,
-																	flexWrap: "wrap",
-																}}
-															>
-																{item.ai_condition_report && (
-																	<span
-																		style={{
-																			fontSize: 10,
-																			fontWeight: 700,
-																			background: cs.bg,
-																			color: cs.color,
-																			borderRadius: 5,
-																			padding: "1px 6px",
-																		}}
-																	>
-																		{item.ai_condition_report}
-																	</span>
-																)}
-																<span
-																	style={{
-																		fontSize: 10,
-																		color: "var(--color-text-tertiary)",
-																		display: "flex",
-																		alignItems: "center",
-																		gap: 2,
-																	}}
-																>
-																	<Clock size={9} /> {timeAgo(item.created_at)}
-																</span>
-																{item.manual_address && (
-																	<span
-																		style={{
-																			fontSize: 10,
-																			color: "var(--color-text-tertiary)",
-																			display: "flex",
-																			alignItems: "center",
-																			gap: 2,
-																			overflow: "hidden",
-																			whiteSpace: "nowrap",
-																			textOverflow: "ellipsis",
-																			maxWidth: 110,
-																		}}
-																	>
-																		<MapPin size={9} /> {item.manual_address}
-																	</span>
-																)}
-															</div>
-														</div>
-
-														{item.phone && (
-															<div
-																style={{
-																	display: "flex",
-																	gap: 5,
-																	marginTop: 8,
-																}}
-															>
-																<button
-																	className="abtn c"
-																	onClick={() => {
-																		window.location.href = `tel:${item.phone}`;
-																	}}
-																>
-																	<Phone size={10} /> Call
-																</button>
-																<button
-																	className="abtn w"
-																	onClick={() => {
-																		const msg = `Namaste! I saw your ${item.title} on NepConnect.`;
-																		window.open(
-																			`https://wa.me/977${item.phone?.replace(/\s/g, "")}?text=${encodeURIComponent(msg)}`,
-																			"_blank",
-																		);
-																	}}
-																>
-																	<MessageCircle size={10} /> WhatsApp
-																</button>
-															</div>
-														)}
-													</div>
-												</div>
-
-												{/* AI footer */}
-												{item.ai_detected_item && (
-													<div
-														style={{
-															borderTop:
-																"0.5px solid var(--color-border-tertiary)",
-															padding: "7px 11px",
-															display: "flex",
-															alignItems: "center",
-															gap: 5,
-														}}
-													>
-														<Sparkles
-															size={10}
-															color="var(--color-text-info)"
-														/>
-														<span
-															style={{
-																fontSize: 11,
-																color: "var(--color-text-secondary)",
-															}}
-														>
-															{item.ai_detected_item}
-														</span>
-													</div>
-												)}
-											</div>
-										);
-									})}
-								</div>
-							)}
-						</div>
-					)}
-
-					{/* Sell tab */}
-					{activeTab === "sell" && (
-						<div className="fu" style={{ animationDelay: "0.09s" }}>
-							<div
-								style={{
-									background: "var(--color-background-primary)",
-									border: "0.5px solid var(--color-border-tertiary)",
-									borderRadius: "var(--border-radius-lg)",
-									padding: "2rem 1.5rem",
-									textAlign: "center",
-									marginBottom: 14,
-								}}
-							>
-								<div
-									style={{
-										width: 48,
-										height: 48,
-										background: "#eaf3de",
-										borderRadius: 14,
-										display: "flex",
-										alignItems: "center",
-										justifyContent: "center",
-										margin: "0 auto 12px",
-									}}
-								>
-									<Plus size={22} color="#3b6d11" />
-								</div>
-								<p
-									style={{
-										fontWeight: 700,
-										margin: "0 0 5px",
-										color: "var(--color-text-primary)",
-										fontSize: 15,
-									}}
-								>
-									New listing
-								</p>
-								<p
-									style={{
-										fontSize: 13,
-										color: "var(--color-text-tertiary)",
-										margin: "0 0 18px",
-										lineHeight: 1.6,
-									}}
-								>
-									Photo + price → AI writes description and condition for you.
-								</p>
-								<Link
-									href="/add-listing"
-									style={{
-										display: "inline-flex",
-										alignItems: "center",
-										gap: 7,
-										background: "#639922",
-										color: "#eaf3de",
-										padding: "11px 26px",
-										borderRadius: "var(--border-radius-md)",
-										fontWeight: 700,
-										fontSize: 14,
-										textDecoration: "none",
-									}}
-								>
-									<Plus size={14} /> Start listing
-								</Link>
-							</div>
-
-							<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-								{[
-									{
-										icon: <Sparkles size={13} color="#185fa5" />,
-										t: "AI condition report",
-										d: "Upload a photo — Claude rates New / Good / Fair automatically.",
-									},
-									{
-										icon: <ShieldCheck size={13} color="#3b6d11" />,
-										t: "Verification badge",
-										d: "Verified listings get significantly more buyer inquiries.",
-									},
-									{
-										icon: <MapPin size={13} color="#993c1d" />,
-										t: "Map pinning",
-										d: "Nearby buyers see your listing on the live map.",
-									},
-								].map(({ icon, t, d }) => (
-									<div
-										key={t}
-										style={{
-											background: "var(--color-background-primary)",
-											border: "0.5px solid var(--color-border-tertiary)",
-											borderRadius: "var(--border-radius-lg)",
-											padding: "11px 13px",
-											display: "flex",
-											alignItems: "flex-start",
-											gap: 10,
-										}}
-									>
-										<div style={{ marginTop: 1 }}>{icon}</div>
-										<div>
-											<p
-												style={{
-													margin: "0 0 2px",
-													fontSize: 13,
-													fontWeight: 700,
-													color: "var(--color-text-primary)",
-												}}
-											>
-												{t}
-											</p>
-											<p
-												style={{
-													margin: 0,
-													fontSize: 12,
-													color: "var(--color-text-tertiary)",
-													lineHeight: 1.5,
-												}}
-											>
-												{d}
-											</p>
-										</div>
-									</div>
-								))}
-							</div>
-						</div>
-					)}
 				</div>
 			</div>
 
-			{/* FAB */}
-			<Link
-				href="/add-listing"
-				style={{
-					position: "fixed",
-					bottom: "2rem",
-					right: "1.5rem",
-					background: "#639922",
-					color: "#eaf3de",
-					borderRadius: 16,
-					padding: "13px 18px",
-					display: "flex",
-					alignItems: "center",
-					gap: 7,
-					fontFamily: "'Sora', var(--font-sans)",
-					fontWeight: 700,
-					fontSize: 13,
-					textDecoration: "none",
-					boxShadow: "0 4px 18px rgba(99,153,34,0.3)",
-					zIndex: 50,
-				}}
-			>
-				<Plus size={15} /> Sell
-			</Link>
-		</main>
+			{/* Stats Cards */}
+			<div className="grid grid-cols-2 gap-3 mb-5">
+				<div className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-100 dark:border-slate-700 shadow-sm">
+					<div className="flex items-center gap-2 text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">
+						<Package size={14} className="text-[var(--color-primary)]" />
+						Active Listings
+					</div>
+					<p className="text-3xl font-black text-gray-900 dark:text-gray-100">
+						{loadingListings ? "..." : listings.length}
+					</p>
+					<p className="text-xs text-gray-400 mt-1">
+						{verified > 0 ? `${verified} AI-verified` : "No verified yet"}
+					</p>
+				</div>
+				<div className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-100 dark:border-slate-700 shadow-sm">
+					<div className="flex items-center gap-2 text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">
+						<Tag size={14} className="text-emerald-600" />
+						Total Value
+					</div>
+					<p className="text-3xl font-black text-[var(--color-primary)]">
+						{loadingListings ? "..." : `NPR ${totalValue.toLocaleString()}`}
+					</p>
+					<p className="text-xs text-gray-400 mt-1">
+						Across all listings
+					</p>
+				</div>
+			</div>
+
+			{/* Verified Banner */}
+			{!loadingListings && verified > 0 && (
+				<div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800 rounded-2xl p-4 flex items-center gap-3 mb-5 animate-fade-in">
+					<div className="w-10 h-10 bg-green-200 dark:bg-green-800 rounded-xl flex items-center justify-center flex-shrink-0">
+						<ShieldCheck size={20} className="text-green-700 dark:text-green-300" />
+					</div>
+					<div className="flex-1">
+						<p className="text-sm font-bold text-green-800 dark:text-green-200">
+							{verified} listing{verified > 1 ? "s" : ""} AI-verified
+						</p>
+						<p className="text-xs text-green-600 dark:text-green-400">
+							Verified listings get significantly more buyer inquiries
+						</p>
+					</div>
+					<ShieldCheck size={18} className="text-green-500 flex-shrink-0" />
+				</div>
+			)}
+
+			{/* Quick Actions */}
+			<div className="flex gap-3 mb-6">
+				<Link
+					href="/add-listing"
+					className="flex-1 bg-gradient-to-r from-[var(--color-primary)] to-emerald-600 text-white rounded-2xl py-3.5 flex items-center justify-center gap-2 font-bold text-sm shadow-lg shadow-green-200 dark:shadow-green-900/30 hover:shadow-xl active:scale-[0.98] transition-all"
+				>
+					<Plus size={18} />
+					New Listing
+				</Link>
+				<Link
+					href="/farmer"
+					className="flex-1 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-2xl py-3.5 flex items-center justify-center gap-2 font-bold text-sm hover:bg-amber-100 dark:hover:bg-amber-900/40 active:scale-[0.98] transition-all"
+				>
+					🌾
+					Farmer Hub
+				</Link>
+			</div>
+
+			{/* Section Title */}
+			<div className="flex items-center justify-between mb-4">
+				<h2 className="font-bold text-lg text-gray-900 dark:text-gray-100 flex items-center gap-2">
+					<Package size={18} className="text-[var(--color-primary)]" />
+					My Listings
+				</h2>
+				{!loadingListings && listings.length > 0 && (
+					<span className="text-xs font-bold text-gray-500">
+						{listings.length} total
+					</span>
+				)}
+			</div>
+
+			{/* Listings / Empty State */}
+			{loadingListings ? (
+				<div className="space-y-3">
+					{[1, 2, 3].map((i) => (
+						<div key={i} className="bg-white dark:bg-slate-800 rounded-2xl overflow-hidden border border-gray-100 dark:border-slate-700">
+							<div className="flex">
+								<div className="w-24 h-24 skeleton" />
+								<div className="flex-1 p-4 space-y-2">
+									<div className="h-4 w-3/4 skeleton" />
+									<div className="h-5 w-1/4 skeleton" />
+								</div>
+							</div>
+						</div>
+					))}
+				</div>
+			) : listings.length === 0 ? (
+				<div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 p-8 text-center">
+					<div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
+						<Package size={28} className="text-[var(--color-primary)]" />
+					</div>
+					<h3 className="font-bold text-lg text-gray-900 dark:text-gray-100 mb-1">
+						No listings yet
+					</h3>
+					<p className="text-sm text-gray-500 dark:text-gray-400 mb-6 max-w-xs mx-auto">
+						Post something and reach local buyers in your community.
+					</p>
+					<Link
+						href="/add-listing"
+						className="btn-primary inline-flex"
+					>
+						<Plus size={16} />
+						Create your first listing
+					</Link>
+				</div>
+			) : (
+				<div className="space-y-3">
+					{listings.map((item, i) => {
+						const img = thumb(item);
+						return (
+							<div
+								key={item.id}
+								className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 overflow-hidden hover:shadow-md transition-all animate-slide-up"
+								style={{ animationDelay: `${i * 0.05}s` }}
+							>
+								<div className="flex">
+									<Link
+										href={`/product/${item.id}`}
+										className="w-24 h-24 flex-shrink-0 relative block bg-gray-100 dark:bg-slate-700"
+									>
+										{img ? (
+											<img src={img} alt={item.title} className="w-full h-full object-cover" />
+										) : (
+											<div className="w-full h-full flex items-center justify-center">
+												<Package size={24} className="text-gray-300" />
+											</div>
+										)}
+										{item.is_verified && (
+											<div className="absolute top-1 left-1 bg-blue-600 rounded p-0.5">
+												<ShieldCheck size={10} className="text-white" />
+											</div>
+										)}
+									</Link>
+									<div className="flex-1 p-3.5 min-w-0 flex flex-col justify-between">
+										<div>
+											<div className="flex items-start justify-between gap-2">
+												<Link
+													href={`/product/${item.id}`}
+													className="font-bold text-sm text-gray-900 dark:text-gray-100 line-clamp-1 hover:text-[var(--color-primary)] transition"
+												>
+													{item.title}
+												</Link>
+												<button
+													onClick={() => handleDelete(item.id)}
+													disabled={deleting === item.id}
+													className="text-gray-300 hover:text-red-500 p-1 transition flex-shrink-0"
+												>
+													{deleting === item.id ? (
+														<div className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+													) : (
+														<Trash2 size={14} />
+													)}
+												</button>
+											</div>
+											<p className="text-lg font-extrabold text-[var(--color-primary)] mt-0.5">
+												NPR {item.price?.toLocaleString()}
+											</p>
+											<div className="flex items-center gap-3 mt-1 text-[10px] text-gray-400">
+												{item.ai_condition_report && (
+													<span className="bg-gray-100 dark:bg-slate-700 px-2 py-0.5 rounded-md font-semibold">
+														{item.ai_condition_report}
+													</span>
+												)}
+												<span className="flex items-center gap-1">
+													<Clock size={10} /> {timeAgo(item.created_at)}
+												</span>
+												{item.manual_address && (
+													<span className="flex items-center gap-1 truncate max-w-[80px]">
+														<MapPin size={10} /> {item.manual_address}
+													</span>
+												)}
+											</div>
+										</div>
+										{item.phone && (
+											<div className="flex gap-2 mt-2">
+												<button
+													onClick={() => window.location.href = `tel:${item.phone}`}
+													className="flex-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 py-1.5 rounded-lg flex items-center justify-center gap-1 text-[10px] font-bold hover:bg-blue-100 transition"
+												>
+													<Phone size={10} /> Call
+												</button>
+												<button
+													onClick={() => {
+														const msg = `Namaste! I saw your ${item.title} on NepConnect.`;
+														window.open(
+															`https://wa.me/977${item.phone?.replace(/\s/g, "")}?text=${encodeURIComponent(msg)}`,
+															"_blank",
+														);
+													}}
+													className="flex-1 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 py-1.5 rounded-lg flex items-center justify-center gap-1 text-[10px] font-bold hover:bg-green-100 transition"
+												>
+													<MessageCircle size={10} /> WhatsApp
+												</button>
+											</div>
+										)}
+									</div>
+								</div>
+								{/* AI footer */}
+								{item.ai_detected_item && (
+									<div className="border-t border-gray-100 dark:border-slate-700 px-3.5 py-2 flex items-center gap-1.5 bg-gray-50/50 dark:bg-slate-700/50">
+										<Sparkles size={10} className="text-blue-500" />
+										<span className="text-[11px] text-gray-500 dark:text-gray-400">
+											AI: {item.ai_detected_item}
+										</span>
+									</div>
+								)}
+							</div>
+						);
+					})}
+				</div>
+			)}
+		</div>
 	);
 }
